@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+    <html lang="en" class="scroll-smooth">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Smart EV Network | Sri Lanka</title>
+
+        <!-- Fonts: Outfit -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+            rel="stylesheet">
+
+        <!-- Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
+
+        <!-- Leaflet JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+        <!-- Dexie DB -->
+        <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+
+        <!-- FontAwesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+        <!-- AOS Animations -->
+        <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
+        <!-- Tailwind Config -->
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            sans: ['Outfit', 'sans-serif'],
+                        },
+                        colors: {
+                            primary: '#00a4b4', // Electrify America signature cyan/teal
+                            darkPage: '#f4f4f5',
+                            cardBg: '#ffffff',
+                            cardBorder: '#e5e7eb', // gray-200
+                            accent: '#111827',  // High contrast slate-900
+                        },
+                        animation: {
+                            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                            'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                        }
+                    }
+                }
+            }
+        </script>
+
+        <style>
+            body {
+                background-color: #596a7a;
+                /* Muted slate blue background */
+                color: #f8fafc;
+                /* Light slate text */
+                min-height: 100vh;
+            }
+
+            .glass {
+                background: rgba(224, 242, 254, 0.82) !important;
+                /* Translucent light blue background */
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                border: 2px solid #065f46 !important;
+                /* Dark green border */
+                border-radius: 12px !important;
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08) !important;
+            }
+
+            .input-glass {
+                background: rgba(224, 242, 254, 0.7) !important;
+                /* Translucent light blue background for inputs */
+                backdrop-filter: blur(4px) !important;
+                -webkit-backdrop-filter: blur(4px) !important;
+                border: 2px solid #065f46 !important;
+                /* Dark green border */
+                color: #111827 !important;
+                transition: all 0.2s ease !important;
+            }
+
+            .input-glass:focus {
+                border-color: #047857 !important;
+                box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.2) !important;
+                outline: none !important;
+            }
+
+            #map {
+                height: 700px;
+                width: 100%;
+                z-index: 10;
+                background: #eaeaea;
+            }
+
+            .leaflet-container {
+                background-color: #eaeaea !important;
+                font-family: 'Outfit', sans-serif;
+            }
+
+            /* Map Custom Popup Styling */
+            .leaflet-popup-content-wrapper {
+                background: #e0f2fe !important;
+                color: #111827 !important;
+                border: 2px solid #065f46 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+            }
+
+            .leaflet-popup-tip {
+                background: #e0f2fe !important;
+                border: 2px solid #065f46 !important;
+            }
+
+            .leaflet-popup-content b {
+                color: #065f46 !important;
+                font-size: 1.1rem !important;
+            }
+
+            /* Custom Scrollbar for table container */
+            .custom-scrollbar::-webkit-scrollbar {
+                height: 6px;
+                width: 6px;
+            }
+
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.05);
+                /* Adjusted for light mode */
+                border-radius: 4px;
+            }
+
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(0, 164, 180, 0.5);
+                border-radius: 4px;
+            }
+
+            .btn-hover-effect {
+                transition: all 0.2s ease;
+            }
+
+            .btn-hover-effect:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0, 164, 180, 0.2);
+            }
+
+            /* Custom Blue Filter for Host Map */
+            .blue-map-tiles {
+                filter: sepia(100%) hue-rotate(185deg) saturate(300%) brightness(0.9) contrast(1.1) !important;
+            }
+
+            #body-bg-map {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                z-index: -10;
+                opacity: 0.45; /* Clean visibility of streets and parks */
+                pointer-events: none;
+                filter: grayscale(20%) contrast(95%) brightness(102%);
+            }
+        </style>
+    </head>
+
+    <body class="antialiased overflow-x-hidden selection:bg-primary selection:text-white">
+        <!-- Body Background Map -->
+        <div id="body-bg-map"></div>
+
+        <!-- Navigation -->
+        <nav class="fixed w-full top-0 z-50 bg-transparent border-b border-transparent transition-all duration-300"
+            id="navbar">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-20">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/15 rounded-xl flex items-center justify-center text-primary text-xl shadow-sm transition-all"
+                            id="logo-box">
+                            <i class="fa-solid fa-bolt-lightning"></i>
+                        </div>
+                        <div>
+                            <span class="font-extrabold text-2xl tracking-tight text-white transition-all" id="logo-text">Electrify<span
+                                    class="text-primary font-light">Lanka</span></span>
+                            <p class="text-[0.65rem] text-white/70 uppercase tracking-[0.2em] -mt-1 font-bold transition-all" id="logo-sub">Public
+                                Network</p>
+                        </div>
+                    </div>
+                    <!-- Glass Bubble Link Container -->
+                    <div class="hidden md:flex items-center space-x-1 bg-white/5 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-lg transition-all duration-300" id="nav-links">
+                        <a href="#hero-section"
+                            class="px-4 py-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-extrabold uppercase tracking-wider">Home</a>
+                        <a href="#host-section"
+                            class="px-4 py-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-extrabold uppercase tracking-wider">Host</a>
+                        <a href="#driver-section"
+                            class="px-4 py-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-extrabold uppercase tracking-wider">Find Charger</a>
+                        <a href="#map-section"
+                            class="px-4 py-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-extrabold uppercase tracking-wider">Map</a>
+                        <a href="#project-details"
+                            class="px-4 py-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-extrabold uppercase tracking-wider">Our Project</a>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Glass Bubble Actions Container -->
+                        <div
+                            class="hidden lg:flex items-center gap-2 bg-white/5 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-lg transition-all duration-300" id="nav-actions">
+                            <a href="#host-section"
+                                class="px-5 py-2.5 text-xs font-bold rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 uppercase tracking-wide">
+                                <i class="fas fa-satellite-dish text-primary"></i> Host Node
+                            </a>
+                            <a href="#driver-section"
+                                class="px-5 py-2.5 text-xs font-bold rounded-full bg-slate-900 text-white shadow hover:bg-slate-800 transition-all flex items-center gap-2 uppercase tracking-wide">
+                                <i class="fas fa-search text-emerald-400"></i> Find Charger
+                            </a>
+                        </div>
+                        <!-- Glass Bubble Nodes Box -->
+                        <div class="bg-white/5 backdrop-blur-md px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/10 shadow-lg transition-all" id="node-box">
+                            <span class="relative flex h-2.5 w-2.5">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                            </span>
+                            <span id="nodeCount" class="text-xs font-bold text-white hidden sm:block">0 Nodes</span>
+                        </div>
+                        <!-- Glass Bubble Register Button -->
+                        <a href="#register"
+                            class="w-11 h-11 bg-white/5 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all shadow-lg border border-white/10 hover:scale-105"
+                            title="User Registration" id="reg-btn">
+                            <i class="fas fa-user"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Full Screen Hero Video Section -->
+        <div id="hero-section" class="relative w-full h-screen overflow-hidden flex items-center justify-center">
+            <!-- Background Video -->
+            <video id="heroVideo" class="absolute top-0 left-0 w-full h-full object-cover z-0" autoplay loop muted playsinline>
+                <source src="hero-video.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            
+            <!-- Dark Overlay for Readability -->
+            <div class="absolute inset-0 bg-slate-900/60 z-10"></div>
+
+            <!-- Sleek Corner Overlay Badges to Cover Watermarks (Gemini watermark cover) -->
+            <!-- Top-Left overlay -->
+            <div class="absolute top-24 left-6 z-30 bg-slate-950/65 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/10 text-white text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 shadow-md">
+                <i class="fa-solid fa-leaf text-emerald-400"></i> 100% Sustainable
+            </div>
+            
+            <!-- Top-Right overlay -->
+            <div class="absolute top-24 right-6 z-30 bg-primary/90 text-white backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-[10px] font-extrabold uppercase tracking-widest shadow-lg flex items-center gap-1.5">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                Active Solar Network
+            </div>
+            
+            <!-- Bottom-Right overlay -->
+            <div class="absolute bottom-8 right-8 z-30 bg-slate-950/70 backdrop-blur-md p-3.5 rounded-xl border border-white/10 shadow-xl flex items-center gap-3 max-w-[190px]">
+                <div class="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center text-primary text-sm shadow-sm">
+                    <i class="fa-solid fa-bolt-lightning text-primary"></i>
+                </div>
+                <div>
+                    <p class="text-[9px] text-white/50 uppercase font-extrabold tracking-wider leading-none mb-1">Sri Lanka</p>
+                    <p class="text-[11px] text-white font-extrabold leading-none">Smart EV Net</p>
+                </div>
+            </div>
+            
+            <!-- Bottom-Left overlay -->
+            <div class="absolute bottom-8 left-8 z-30 bg-slate-950/65 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white/70 text-[9px] font-bold uppercase tracking-wider shadow-md">
+                P2P Infrastructure
+            </div>
+            
+            <!-- Content Overlay -->
+            <div class="relative z-20 text-center max-w-4xl mx-auto px-4 flex flex-col items-center justify-center h-full" data-aos="zoom-in" data-aos-duration="1000">
+                <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 text-primary text-xs font-extrabold uppercase tracking-widest mb-6 border border-primary/30">
+                    <i class="fa-solid fa-circle-nodes animate-pulse"></i> Smart P2P Network
+                </span>
+                
+                <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-white mb-6 tracking-tight leading-none drop-shadow-md">
+                    Decentralized <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">Charging Grid</span>
+                </h1>
+                
+                <p class="text-slate-200 text-lg sm:text-xl md:text-2xl font-medium leading-relaxed mb-10 max-w-3xl drop-shadow-sm">
+                    Empowering sustainable transport by leveraging distributed infrastructure. Peer-to-peer EV charging made simple, fast, and remarkably accessible.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-5 justify-center w-full sm:w-auto">
+                    <a href="#host-section"
+                        class="px-10 py-5 bg-gradient-to-r from-primary to-emerald-500 text-white font-extrabold rounded-xl hover:shadow-2xl hover:shadow-primary/30 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3 uppercase tracking-wider text-sm">
+                        <i class="fas fa-satellite-dish text-white"></i> Host a Node
+                    </a>
+                    <a href="#driver-section"
+                        class="px-10 py-5 bg-white/10 backdrop-blur-md text-white border border-white/20 font-extrabold rounded-xl hover:bg-white/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3 uppercase tracking-wider text-sm">
+                        <i class="fas fa-search text-emerald-400"></i> Find Charger
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Scroll Indicator -->
+            <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 flex flex-col items-center gap-2 text-white/50 text-xs font-bold tracking-widest uppercase animate-bounce cursor-pointer" onclick="document.getElementById('dashboard').scrollIntoView({behavior: 'smooth'})">
+                <span>Explore</span>
+                <i class="fas fa-chevron-down text-sm text-primary"></i>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" id="dashboard">
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10" id="host-section">
+                <!-- Host Registration Form -->
+                <div class="lg:col-span-5">
+                    <div class="glass p-6 relative overflow-hidden h-full" data-aos="fade-up" data-aos-delay="100">
+                        <h2
+                            class="text-xl font-bold mb-5 flex items-center gap-3 text-slate-900 border-b border-gray-100 pb-4">
+                            <div class="bg-emerald-100 p-2 rounded-lg text-emerald-600">
+                                <i class="fas fa-plus text-emerald-600"></i>
+                            </div>
+                            Host a Node
+                        </h2>
+
+                        <form id="nodeForm" class="space-y-4">
+                            <!-- Fixed to Solar Source -->
+                            <input type="hidden" name="sourceType" id="sourceType" value="Solar">
+                            
+                            <div class="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100/80 flex items-center gap-3 text-emerald-800">
+                                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                                    <i class="fas fa-solar-panel text-sm"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold uppercase tracking-wider leading-none mb-1">Solar PV Source Only</h4>
+                                    <p class="text-[10px] text-emerald-600/90 font-medium">All published nodes operate on 100% sustainable solar power.</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Host
+                                    Name</label>
+                                <input type="text" id="hostName" required
+                                    class="w-full input-glass rounded-xl px-4 py-3 placeholder-gray-400 font-medium"
+                                    placeholder="E.g. Electrify Colombo">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Power
+                                        Level</label>
+                                    <select id="outletType"
+                                        class="w-full input-glass rounded-xl px-4 py-3 appearance-none font-medium text-sm">
+                                        <option value="15A Level 1">Level 1 (15A)</option>
+                                        <option value="30A Level 2">Level 2 (30A)</option>
+                                        <option value="CCS DC Fast" id="solarOutletOpt">DC Fast (CCS)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Rate
+                                        (LKR)</label>
+                                    <div class="relative">
+                                        <input type="number" id="rate" required
+                                            class="w-full input-glass rounded-xl px-4 py-3 pl-10 hidden-arrows font-medium"
+                                            placeholder="120" min="1">
+                                        <span class="absolute left-4 top-3.5 text-gray-500 font-bold text-sm">Rs</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="solarField">
+                                <label
+                                    class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Solar
+                                    Capacity (kW)</label>
+                                <div class="relative">
+                                    <input type="number" id="solarCap" required
+                                        class="w-full input-glass rounded-xl px-4 py-3 pr-10 font-medium"
+                                        placeholder="E.g. 5.5" step="0.1">
+                                    <span class="absolute right-4 top-3.5 text-gray-500 font-bold text-sm">kW</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Location
+                                    Coordinates</label>
+                                <div id="host-map"
+                                    class="w-full h-72 rounded-xl border-2 border-[#065f46] mb-2 z-10 relative"></div>
+                                <div class="relative group">
+                                    <input type="text" id="coords" readonly required
+                                        class="w-full input-glass rounded-xl px-4 py-3 pl-10 bg-[#e0f2fe]/60 cursor-not-allowed text-slate-800 font-mono text-sm"
+                                        placeholder="Pick location from the map above...">
+                                    <i class="fas fa-map-marker-alt absolute left-4 top-3.5 text-emerald-600"></i>
+                                </div>
+                            </div>
+
+                            <button type="submit"
+                                class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-2 shadow-lg shadow-emerald-600/20 uppercase tracking-wider text-sm">
+                                Publish Station
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- How to Host Guidelines -->
+                <div class="lg:col-span-7">
+                    <div class="glass p-8 relative overflow-hidden h-full flex flex-col justify-center"
+                        data-aos="fade-up" data-aos-delay="200">
+                        <h2 class="text-2xl font-bold mb-6 text-slate-900 border-b border-gray-100 pb-4">
+                            How to become a <span class="text-primary">Node Host?</span>
+                        </h2>
+                        <div class="flex flex-col md:flex-row gap-8 items-center">
+                            <div
+                                class="w-full md:w-1/2 rounded-2xl overflow-hidden shadow-lg border-2 border-[#065f46] relative group">
+                                <div
+                                    class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                                </div>
+                                <img src="node.png"
+                                    alt="Home EV Charging"
+                                    class="w-full h-auto object-contain transform group-hover:scale-105 transition-transform duration-500">
+                            </div>
+                            <div class="w-full md:w-1/2 space-y-6">
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-primary/10 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-primary group-hover:text-white transition-colors">
+                                        1</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Select Source</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Choose between standard Grid
+                                            connection or your localized Solar PV plant.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-emerald-500/10 text-emerald-600 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                        2</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Set Parameters</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Provide capabilities, your
+                                            custom rate per kWh, and pin location down below.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-blue-500/10 text-blue-600 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        3</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Earn & Empower</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Once published, EV drivers can
+                                            locate your charger and you start earning!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Registry Table -->
+            <div class="mb-14">
+                <div class="glass overflow-hidden" data-aos="fade-up" data-aos-delay="300">
+                    <div class="p-5 border-b-2 border-[#065f46] flex justify-between items-center bg-[#e0f2fe]">
+                        <h3 class="font-extrabold text-slate-900 flex items-center gap-2 text-lg">
+                            Active Network Registry
+                        </h3>
+                        <button onclick="clearAllData()"
+                            class="text-xs px-4 py-2 rounded-lg bg-[#e0f2fe] border-2 border-emerald-700 hover:bg-[#d0eafc] text-slate-700 font-bold transition-all flex items-center gap-2 shadow-sm">
+                            <i class="fas fa-eraser"></i> Clear Registry
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto custom-scrollbar max-h-72">
+                        <table class="w-full text-left border-collapse">
+                            <thead
+                                class="bg-[#d0eafc] text-[11px] uppercase tracking-widest text-slate-700 sticky top-0 border-b-2 border-[#065f46] shadow-sm z-10 font-bold">
+                                <tr>
+                                    <th class="p-4">Station Details</th>
+                                    <th class="p-4">Connector</th>
+                                    <th class="p-4">Pricing</th>
+                                    <th class="p-4">Status & Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nodeTableBody" class="text-sm divide-y divide-[#065f46]/20">
+                                <!-- Dynamic Content -->
+                            </tbody>
+                        </table>
+
+                        <!-- Empty State -->
+                        <div id="emptyState" class="hidden flex-col items-center justify-center p-12 text-slate-500">
+                            <i class="fas fa-charging-station text-5xl mb-4 text-emerald-700"></i>
+                            <p class="text-sm font-semibold text-slate-700">No charging stations connected yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 mb-6 pt-6 border-t border-[#065f46]/30">
+                <div class="w-10 h-10 bg-[#e0f2fe] border-2 border-[#065f46] rounded-full flex items-center justify-center text-emerald-800 shadow-sm"><i
+                        class="fas fa-map-location-dot"></i></div>
+                <h2 class="text-2xl font-extrabold text-white">Discover Network Nodes</h2>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
+                <!-- Driver Section: Find Charger -->
+                <div class="lg:col-span-5 h-full">
+                    <div class="glass p-6 relative overflow-hidden h-full" id="driver-section" data-aos="fade-up">
+                        <h2
+                            class="text-xl font-bold mb-4 flex items-center gap-3 text-slate-900 border-b border-gray-100 pb-4">
+                            <div class="bg-primary/10 p-2 rounded-lg text-primary">
+                                <i class="fas fa-location-arrow"></i>
+                            </div>
+                            Find a Charger
+                        </h2>
+                        <p class="text-sm text-gray-500 mb-5 leading-relaxed font-medium">
+                            Locate an optimal charging station nearby across the map.
+                        </p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button onclick="applyFilter('All')" id="btn-filter-All"
+                                        class="py-2.5 text-xs font-bold rounded-lg bg-slate-900 text-white transition-all shadow-sm">
+                                        All
+                                    </button>
+                                    <button onclick="applyFilter('Solar')" id="btn-filter-Solar"
+                                        class="py-2.5 text-xs font-bold rounded-lg bg-[#e0f2fe] text-slate-700 border-2 border-[#065f46] hover:bg-[#d0eafc] transition-all">
+                                        <i class="fas fa-sun text-slate-600"></i> Solar
+                                    </button>
+                                    <button onclick="applyFilter('Fast')" id="btn-filter-Fast"
+                                        class="py-2.5 text-xs font-bold rounded-lg bg-[#e0f2fe] text-slate-700 border-2 border-[#065f46] hover:bg-[#d0eafc] transition-all">
+                                        <i class="fas fa-bolt text-yellow-600"></i> Fast
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onclick="findNearestCharger()" id="find-nearest-btn"
+                                class="w-full py-3.5 border-2 border-[#065f46] bg-[#e0f2fe] hover:bg-emerald-800 hover:text-white text-emerald-800 font-bold rounded-xl transition-all flex items-center justify-center gap-2 group uppercase tracking-widest text-sm">
+                                <i class="fas fa-location-crosshairs group-hover:scale-110 transition-transform"></i>
+                                Locate Station
+                            </button>
+
+                            <!-- Quick Bill Estimator Widget -->
+                            <div class="pt-4 border-t border-gray-100 mt-4">
+                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <i class="fas fa-calculator text-emerald-500"></i> Quick Bill Estimator
+                                </h3>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Select Station</label>
+                                        <select id="calcHostSelect" onchange="updateEstimatorFromSelect()" class="w-full bg-[#e0f2fe] border-2 border-[#065f46] focus:border-emerald-800 focus:ring-emerald-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800">
+                                            <option value="">-- Choose a Station --</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Dynamic details block -->
+                                    <div id="estimatorDetails" class="hidden space-y-2.5 bg-sky-100/70 p-4 rounded-xl border-2 border-[#065f46]">
+                                        <div class="flex justify-between text-xs font-semibold">
+                                            <span class="text-slate-600">Location:</span>
+                                            <span id="estLocation" class="text-slate-700 font-mono">0.000, 0.000</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs font-semibold">
+                                            <span class="text-slate-600">Power Level:</span>
+                                            <span id="estPower" class="text-slate-700">15A Level 1</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs font-semibold">
+                                            <span class="text-slate-600">Rate:</span>
+                                            <span class="text-emerald-800 font-bold">LKR <span id="estRate">0</span>/kWh</span>
+                                        </div>
+                                        
+                                        <div class="pt-1">
+                                            <label class="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Energy Amount (kWh)</label>
+                                            <input type="number" id="estUnits" value="10" min="1" oninput="calculateEstTotal()" class="w-full bg-[#e0f2fe] border-2 border-[#065f46] rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 font-mono focus:border-emerald-800 focus:ring-emerald-100">
+                                        </div>
+                                        
+                                        <hr class="border-[#065f46] my-1">
+                                        <div class="flex justify-between items-center pt-1 text-xs font-bold">
+                                            <span class="text-slate-700 uppercase tracking-wider text-[10px]">Estimated Bill (with 2% fee):</span>
+                                            <span class="text-emerald-800 font-mono text-sm font-extrabold">LKR <span id="estTotal">0.00</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- How to Find Guidelines -->
+                <div class="lg:col-span-7">
+                    <div class="glass p-8 relative overflow-hidden h-full flex flex-col justify-center"
+                        data-aos="fade-up" data-aos-delay="100">
+                        <h2 class="text-2xl font-bold mb-6 text-slate-900 border-b border-gray-100 pb-4">
+                            How to find a <span class="text-primary">Charger?</span>
+                        </h2>
+                        <div class="flex flex-col md:flex-row gap-8 items-center">
+                            <div
+                                class="w-full md:w-1/2 rounded-2xl overflow-hidden shadow-lg border-2 border-[#065f46] relative group">
+                                <div
+                                    class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                                </div>
+                                <img src="https://images.unsplash.com/photo-1593941707882-a5bba14938cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80"
+                                    alt="Find EV Charger"
+                                    class="w-full h-80 object-cover transform group-hover:scale-105 transition-transform duration-500">
+                            </div>
+                            <div class="w-full md:w-1/2 space-y-6">
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-primary/10 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-primary group-hover:text-white transition-colors">
+                                        1</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Set Preferences</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Filter stations based on
+                                            standard connection, solar PV powered, or DC Fast chargers.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-emerald-500/10 text-emerald-600 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                        2</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Locate Station</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Use the Locate Station button
+                                            to find the nearest and optimal matching charger on the map below.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 items-start group">
+                                    <div
+                                        class="bg-blue-500/10 text-blue-655 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-extrabold text-lg group-hover:bg-blue-555 group-hover:text-white transition-colors">
+                                        3</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-base mb-1">Navigate & Charge</h4>
+                                        <p class="text-sm text-slate-600 leading-relaxed">Pinpoint the map marker to view
+                                            detailed stats and begin your charging session.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Container -->
+            <div class="w-full mb-10 flex flex-col gap-6" id="map-section">
+                <div class="glass overflow-hidden p-1 relative h-full min-h-[700px]" data-aos="fade-up">
+                    <div id="map" class="w-full h-full rounded-xl relative z-10 absolute inset-0"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Project Details Section -->
+        <section
+            class="relative w-full py-24 mt-4 bg-slate-900 overflow-hidden shadow-[inset_0_10px_30px_rgba(0,0,0,0.5)]"
+            id="project-details">
+            <!-- Background Image with Overlay -->
+            <div class="absolute inset-0 z-0 opacity-20 bg-cover bg-center bg-fixed"
+                style="background-image: url('https://images.unsplash.com/photo-1593941707882-a5bba14938cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');">
+            </div>
+            <div class="absolute inset-0 z-0 bg-gradient-to-b from-slate-900 via-transparent to-slate-900"></div>
+            <div class="absolute inset-0 z-0 bg-gradient-to-r from-slate-900 via-slate-900/80 to-transparent"></div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+
+                <!-- Tab-like Header -->
+                <div class="flex justify-start mb-12" data-aos="fade-right">
+                    <div
+                        class="inline-flex bg-white/5 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-lg">
+                        <span
+                            class="px-8 py-3 bg-gradient-to-r from-primary to-blue-500 text-white rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+                            <i class="fas fa-layer-group"></i> Project Details
+                        </span>
+                        <span class="px-8 py-3 text-gray-400 font-bold text-sm flex items-center gap-2">
+                            <i class="fas fa-chart-line"></i> Statistics
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                    <!-- Detail Text -->
+                    <div class="space-y-8" data-aos="fade-up" data-aos-delay="100">
+                        <div>
+                            <h2
+                                class="text-4xl md:text-5xl font-extrabold text-white mb-6 tracking-tight leading-tight">
+                                Pioneering Sri Lanka's <br>
+                                <span
+                                    class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400 border-b-4 border-emerald-500 pb-1">EV
+                                    Infrastructure</span>
+                            </h2>
+                            <p class="text-gray-300 text-lg leading-relaxed font-medium">
+                                Electrify Lanka is a community-driven, decentralized platform aiming to revolutionize EV
+                                charging across the island. We seamlessly connect EV drivers with property and solar
+                                grid owners, transforming idle power into an active, monetized network.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-5">
+                            <div
+                                class="bg-gray-800/40 backdrop-blur-xl border border-gray-700/50 p-6 rounded-2xl hover:bg-gray-800/60 transition-all group flex gap-5 shadow-xl">
+                                <div
+                                    class="w-14 h-14 shrink-0 bg-primary/20 rounded-xl flex items-center justify-center text-primary text-2xl group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-network-wired"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-white mb-2">Decentralized Model</h3>
+                                    <p class="text-gray-400 text-sm leading-relaxed">Transforming ordinary homes,
+                                        hotels, and businesses with excess electricity or solar capacity into monetized
+                                        public charging nodes.</p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="bg-gray-800/40 backdrop-blur-xl border border-gray-700/50 p-6 rounded-2xl hover:bg-gray-800/60 transition-all group flex gap-5 shadow-xl">
+                                <div
+                                    class="w-14 h-14 shrink-0 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 text-2xl group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-leaf"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-white mb-2">Sustainable Integration</h3>
+                                    <p class="text-gray-400 text-sm leading-relaxed">Prioritizing green energy by
+                                        distinguishing fully solar-powered nodes, accelerating the nation's journey
+                                        towards a zero-emission ecosystem.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Photos/Gallery Grid -->
+                    <div class="grid grid-cols-2 gap-4 h-full" data-aos="zoom-in" data-aos-delay="200">
+                        <div
+                            class="col-span-2 rounded-3xl overflow-hidden border border-white/10 shadow-2xl relative group h-64 md:h-72">
+                            <div
+                                class="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-all duration-500 z-10">
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1660606786522-8baf3dbe424a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+                                alt="EV Charging Station"
+                                class="w-full h-full object-cover transform scale-105 group-hover:scale-110 transition-transform duration-700">
+                            <div
+                                class="absolute bottom-4 left-5 z-20 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                <span
+                                    class="bg-primary/90 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-lg"><i
+                                        class="fas fa-bolt mr-1"></i> Fast Charging</span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-2xl overflow-hidden border border-white/10 shadow-xl relative group h-40 md:h-48">
+                            <div
+                                class="absolute inset-0 bg-black/40 group-hover:bg-black/10 transition-all duration-500 z-10">
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1617704548623-340376564e68?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80"
+                                alt="Solar Panels"
+                                class="w-full h-full object-cover transform scale-105 group-hover:scale-110 transition-transform duration-700">
+                            <div class="absolute bottom-3 left-3 z-20">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white">
+                                    <i class="fas fa-sun text-xs"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-2xl overflow-hidden border border-white/10 shadow-xl relative group h-40 md:h-48">
+                            <div
+                                class="absolute inset-0 bg-black/40 group-hover:bg-black/10 transition-all duration-500 z-10">
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80"
+                                alt="Electric Car Dashboard"
+                                class="w-full h-full object-cover transform scale-105 group-hover:scale-110 transition-transform duration-700">
+                            <div class="absolute bottom-3 left-3 z-20">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white">
+                                    <i class="fas fa-car text-xs"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bill Calculator Modal -->
+        <div id="calcModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCalculator()"></div>
+
+            <!-- Modal Content -->
+            <div class="bg-[#e0f2fe] border-2 border-[#065f46] p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl transform scale-95 opacity-0 transition-all duration-300"
+                id="calcModalContent">
+                <button onclick="closeCalculator()"
+                    class="absolute top-5 right-5 text-slate-700 hover:text-slate-900 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+
+                <h2 class="text-2xl font-extrabold mb-1 flex items-center gap-2 text-slate-900">
+                    Charging Estimator
+                </h2>
+                <p id="calcStationName" class="text-sm text-slate-500 mb-6 border-b-2 border-[#065f46] pb-4 font-bold">
+                    Station Name</p>
+
+                <div class="space-y-6">
+                    <div class="bg-sky-100/60 p-4 rounded-xl border-2 border-[#065f46] flex justify-between items-center">
+                        <span class="text-sm font-bold text-slate-700 uppercase tracking-widest">Pricing Rate</span>
+                        <span class="text-emerald-800 font-mono font-extrabold text-lg">LKR <span
+                                id="calcStationRate">0</span><span class="text-xs text-slate-500">/kWh</span></span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Energy Amount
+                            (kWh)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-4 cursor-pointer text-slate-500 hover:text-[#065f46] z-10 transition-colors"
+                                onclick="adjUnits(-1)">
+                                <i class="fas fa-minus-circle text-xl"></i>
+                            </div>
+                            <input type="number" id="calcUnits" oninput="calculateTotal()"
+                                class="w-full bg-[#e0f2fe] border-2 border-[#065f46] rounded-xl px-12 py-4 focus:border-[#047857] focus:ring-2 focus:ring-emerald-100 text-xl font-bold text-center hidden-arrows text-slate-900 transition-all font-mono"
+                                placeholder="0" min="1" value="10">
+                            <div class="absolute inset-y-0 right-12 flex items-center pr-2 cursor-pointer text-slate-500 hover:text-[#065f46] z-10 transition-colors"
+                                onclick="adjUnits(1)">
+                                <i class="fas fa-plus-circle text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-sky-100/50 p-5 rounded-xl border-2 border-[#065f46] space-y-3 relative overflow-hidden">
+                        <div class="flex justify-between text-sm font-semibold">
+                            <span class="text-slate-500">Energy Cost</span>
+                            <span class="text-slate-800 font-mono">LKR <span id="calcEnergyCost"
+                                    class="font-bold">0.00</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm font-semibold">
+                            <span class="text-slate-500">Network Surcharge (2%)</span>
+                            <span class="text-slate-800 font-mono">LKR <span id="calcNetFee"
+                                    class="font-bold">0.00</span></span>
+                        </div>
+                        <hr class="border-[#065f46] my-2">
+                        <div class="flex justify-between items-center pt-1">
+                            <span class="text-slate-900 font-extrabold uppercase tracking-wide">Estimated Total</span>
+                            <span class="text-emerald-800 font-bold font-mono text-xl">LKR <span
+                                    id="calcTotal">0.00</span></span>
+                        </div>
+                    </div>
+
+                    <button onclick="closeCalculator()"
+                        class="w-full py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-sm shadow-md shadow-emerald-700/10">
+                        Finish Review
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="border-t-2 border-[#065f46] mt-auto bg-[#e0f2fe]">
+            <div
+                class="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm font-semibold text-slate-700">
+                <p>&copy; 2026 Electrify Lanka. <span class="font-normal text-slate-500">All rights reserved.</span></p>
+                <p class="flex items-center gap-2 text-slate-700">
+                    Designed for public infrastructure
+                </p>
+            </div>
+        </footer>
+
+        <!-- Scripts -->
+        <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+        <script>
+            // Initialize AOS
+            AOS.init({
+                duration: 800,
+                once: true,
+                offset: 50,
+            });
+
+            // Setup Dexie Database
+            function toggleSolarFields(isSolar) {
+                const solarField = document.getElementById('solarField');
+                const solarOpt = document.getElementById('solarOutletOpt');
+                if (isSolar) {
+                    solarField.classList.remove('hidden');
+                    solarOpt.classList.remove('hidden');
+                } else {
+                    solarField.classList.add('hidden');
+                    solarOpt.classList.add('hidden');
+                }
+            }
+
+            const db = new Dexie("SmartEVNetworkDB");
+            db.version(1).stores({
+                nodes: "++id, hostName, outletType, rate, lat, lng"
+            });
+            db.version(2).stores({
+                nodes: "++id, hostName, outletType, rate, lat, lng, sourceType, solarCapacity" // upgraded schema
+            });
+
+            // Initialize Map
+            // Centered and restricted around Sri Lanka
+            const sriLankaBounds = [
+                [5.80, 79.50], // Southwest bounds
+                [9.90, 82.00]  // Northeast bounds
+            ];
+
+            const map = L.map('map', {
+                zoomControl: false, // custom position later
+                maxBounds: sriLankaBounds,
+                maxBoundsViscosity: 1.0,
+                minZoom: 7.5
+            }).setView([7.8731, 80.7718], 7.5);
+
+            // Add minimalist dark matter tiles (CartoDB)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // Initialize Host Map (Blue Theme)
+            const hostMap = L.map('host-map', {
+                zoomControl: true,
+                maxBounds: sriLankaBounds,
+                maxBoundsViscosity: 1.0,
+                minZoom: 7.0
+            }).setView([7.8731, 80.7718], 7.0);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO',
+                className: 'blue-map-tiles',
+                maxZoom: 20
+            }).addTo(hostMap);
+
+            // Initialize Body Background Map (translucent map layer)
+            const bodyBgMap = L.map('body-bg-map', {
+                zoomControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                touchZoom: false
+            }).setView([6.9271, 79.8612], 13); // Centered on Colombo, zoom level 13
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: ''
+            }).addTo(bodyBgMap);
+
+            let tempMarker = null;
+            let tempHostMarker = null;
+
+            // Custom Leaflet Icons
+            const createPulsingIcon = (color, pulse = true) => L.divIcon({
+                className: 'custom-div-icon',
+                html: `
+                <div style="position:relative; width: 20px; height: 20px;">
+                    ${pulse ? `<div style="position:absolute; width: 100%; height: 100%; background-color: ${color}; border-radius: 50%; opacity: 0.4; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>` : ''}
+                    <div style="position:absolute; top: 4px; left: 4px; width: 12px; height: 12px; background-color: ${color}; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${color};"></div>
+                </div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10],   // center the icon
+                popupAnchor: [0, -10]
+            });
+
+            const tempIcon = createPulsingIcon('#f59e0b'); // Amber
+            const nodeIcon = createPulsingIcon('#10b981'); // Emerald
+
+            // Handle Map Clicks to add coordinates
+            function handleMapClick(e) {
+                const { lat, lng } = e.latlng;
+                const coordInput = document.getElementById('coords');
+
+                // Format coords nicely
+                coordInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+                // Highlight input briefly
+                coordInput.classList.add('border-accent', 'shadow-[0_0_10px_rgba(245,158,11,0.3)]');
+                setTimeout(() => {
+                    coordInput.classList.remove('border-accent', 'shadow-[0_0_10px_rgba(245,158,11,0.3)]');
+                }, 500);
+
+                if (tempMarker) map.removeLayer(tempMarker);
+                if (tempHostMarker) hostMap.removeLayer(tempHostMarker);
+
+                tempMarker = L.marker([lat, lng], { icon: tempIcon }).addTo(map);
+                tempHostMarker = L.marker([lat, lng], { icon: tempIcon }).addTo(hostMap)
+                    .bindPopup("<div class='pt-1'><b>Selected Placement</b><br><span class='text-[10px] text-gray-500'>Fill the form below to activate</span></div>")
+                    .openPopup();
+            }
+
+            map.on('click', handleMapClick);
+            hostMap.on('click', handleMapClick);
+
+            // Driver Portal Logic
+            let currentFilter = 'All';
+            let userLocationMarker = null;
+
+            function applyFilter(filterType) {
+                currentFilter = filterType;
+
+                const buttons = ['All', 'Solar', 'Fast'];
+                buttons.forEach(ft => {
+                    const btn = document.getElementById('btn-filter-' + ft);
+                    if (btn) {
+                        if (ft === filterType) {
+                            btn.className = "py-2.5 text-xs font-bold rounded-lg bg-emerald-800 text-white border-2 border-emerald-900 shadow-md transition-all flex items-center justify-center gap-1";
+                        } else {
+                            // Restore default styling depending on icon
+                            const iconHtml = ft === 'Solar' ? '<i class="fas fa-sun text-slate-600"></i> ' : (ft === 'Fast' ? '<i class="fas fa-bolt text-yellow-750"></i> ' : '');
+                            btn.className = "py-2.5 text-xs font-bold rounded-lg bg-[#e0f2fe] text-slate-700 border-2 border-[#065f46] hover:bg-[#d0eafc] transition-all flex items-center justify-center gap-1";
+                            btn.innerHTML = iconHtml + ft;
+                        }
+                    }
+                });
+
+                refreshUI();
+            }
+
+            async function findNearestCharger() {
+                let nodes = await db.nodes.toArray();
+                if (nodes.length === 0) {
+                    alert("No charging nodes available in the network yet!");
+                    return;
+                }
+
+                // Filter out offline nodes
+                nodes = nodes.filter(n => (n.status || 'ONLINE') === 'ONLINE');
+
+                if (currentFilter === 'Solar') {
+                    nodes = nodes.filter(n => n.sourceType === 'Solar');
+                } else if (currentFilter === 'Fast') {
+                    nodes = nodes.filter(n => n.outletType.includes('30A') || n.outletType.includes('Fast') || n.outletType.includes('Type 2'));
+                }
+
+                if (nodes.length === 0) {
+                    alert("No nodes matching your filter criteria!");
+                    return;
+                }
+
+                const btn = document.getElementById('find-nearest-btn');
+                const originalHTML = btn.innerHTML;
+
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> LOCATING...';
+                btn.classList.add('opacity-80', 'cursor-not-allowed');
+
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const userLat = position.coords.latitude;
+                            const userLng = position.coords.longitude;
+                            locateNearestFrom(userLat, userLng, nodes, btn, originalHTML, false);
+                        },
+                        (error) => {
+                            console.warn("Geolocation denied or failed, falling back to map center.", error);
+                            const mapCenter = map.getCenter();
+                            locateNearestFrom(mapCenter.lat, mapCenter.lng, nodes, btn, originalHTML, true);
+                        },
+                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                    );
+                } else {
+                    console.warn("Geolocation not supported, falling back to map center.");
+                    const mapCenter = map.getCenter();
+                    locateNearestFrom(mapCenter.lat, mapCenter.lng, nodes, btn, originalHTML, true);
+                }
+            }
+
+            function locateNearestFrom(userLat, userLng, nodes, btn, originalHTML, isSimulated) {
+                let nearestNode = null;
+                let minDistance = Infinity;
+
+                nodes.forEach(n => {
+                    const dist = Math.pow(n.lat - userLat, 2) + Math.pow(n.lng - userLng, 2);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestNode = n;
+                    }
+                });
+
+                if (nearestNode) {
+                    map.flyTo([nearestNode.lat, nearestNode.lng], 12, {
+                        animate: true,
+                        duration: 1.5
+                    });
+
+                    if (userLocationMarker) map.removeLayer(userLocationMarker);
+
+                    // If simulated, slightly offset to show distance virtually, if real, use exact user coordinates
+                    const displayLat = isSimulated ? nearestNode.lat - 0.03 : userLat;
+                    const displayLng = isSimulated ? nearestNode.lng - 0.03 : userLng;
+
+                    const simText = isSimulated ? "<br><span class='text-[10px] text-gray-400'>(Simulated)</span>" : "";
+
+                    const userIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `
+                        <div style="position:relative; width: 24px; height: 24px;">
+                            <div style="position:absolute; width: 100%; height: 100%; background-color: #3b82f6; border-radius: 50%; opacity: 0.4; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+                            <div style="position:absolute; top: 5px; left: 5px; width: 14px; height: 14px; background-color: #3b82f6; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px #3b82f6;"></div>
+                        </div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+
+                    userLocationMarker = L.marker([displayLat, displayLng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
+                        .bindPopup("<div class='text-center py-1'><b style='color:#3b82f6; font-size:1rem;'>Your Location</b>" + simText + "</div>")
+                        .openPopup();
+
+                    setTimeout(() => {
+                        map.eachLayer((layer) => {
+                            if (layer instanceof L.Marker && layer.getLatLng && layer !== userLocationMarker && layer !== tempMarker) {
+                                const ll = layer.getLatLng();
+                                if (Math.abs(ll.lat - nearestNode.lat) < 0.0001 && Math.abs(ll.lng - nearestNode.lng) < 0.0001) {
+                                    layer.openPopup();
+                                }
+                            }
+                        });
+                    }, 1800);
+                }
+
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+            }
+
+            // Load UI Data functions
+            async function refreshUI() {
+                try {
+                    let allNodes = await db.nodes.toArray();
+
+                    // Populate Estimator Select dropdown
+                    const hostSelect = document.getElementById('calcHostSelect');
+                    if (hostSelect) {
+                        const selectedVal = hostSelect.value;
+                        hostSelect.innerHTML = '<option value="">-- Choose a Station --</option>';
+                        allNodes.forEach(node => {
+                            const isOnline = (node.status || 'ONLINE') === 'ONLINE';
+                            const opt = document.createElement('option');
+                            opt.value = node.id;
+                            opt.text = `${node.hostName} (${node.outletType})${isOnline ? '' : ' - [OFFLINE]'}`;
+                            if (!isOnline) {
+                                opt.disabled = true;
+                            }
+                            hostSelect.appendChild(opt);
+                        });
+                        // Restore selection if it still exists
+                        if (allNodes.some(n => n.id == selectedVal)) {
+                            hostSelect.value = selectedVal;
+                        } else {
+                            const estDetails = document.getElementById('estimatorDetails');
+                            if (estDetails) estDetails.classList.add('hidden');
+                        }
+                    }
+
+                    // Update Badge Count with absolute total
+                    document.getElementById('nodeCount').innerText = `${allNodes.length} Active Node${allNodes.length !== 1 ? 's' : ''}`;
+
+                    // Filter nodes for the table and map
+                    let nodes = allNodes;
+                    if (currentFilter === 'Solar') {
+                        nodes = nodes.filter(n => n.sourceType === 'Solar');
+                    } else if (currentFilter === 'Fast') {
+                        nodes = nodes.filter(n => n.outletType.includes('30A') || n.outletType.includes('Fast') || n.outletType.includes('Type 2'));
+                    }
+
+                    const tbody = document.getElementById('nodeTableBody');
+                    const emptyState = document.getElementById('emptyState');
+
+                    if (nodes.length === 0) {
+                        tbody.innerHTML = '';
+                        emptyState.style.display = 'flex';
+                    } else {
+                        emptyState.style.display = 'none';
+                        // Populate Table
+                        tbody.innerHTML = nodes.map(node => {
+                            const isSolar = node.sourceType === 'Solar';
+                            const typeColor = isSolar ? 'text-emerald-800' : 'text-primary';
+                            const typeBgColor = isSolar ? 'bg-emerald-100' : 'bg-primary/10';
+                            const typeBorderColor = isSolar ? 'border-emerald-300' : 'border-primary/20';
+                            const icon = isSolar ? 'fa-solar-panel' : 'fa-plug-circle-bolt';
+                            const sourceBadge = isSolar ? `<div class="text-[10px] text-emerald-850 font-bold mt-1 bg-emerald-100 inline-block px-1.5 py-0.5 rounded border border-emerald-300"><i class="fas fa-sun"></i> Solar PV ${node.solarCapacity ? '[' + node.solarCapacity + 'kW]' : ''}</div>` : '';
+
+                            const status = node.status || 'ONLINE';
+                            const isOnline = status === 'ONLINE';
+
+                            const statusIndicator = isOnline 
+                                ? `<div class="flex items-center gap-2">
+                                        <span class="relative flex h-2 w-2">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                                        </span>
+                                        <span class="text-emerald-700 text-xs font-bold tracking-wide">ONLINE</span>
+                                    </div>`
+                                : `<div class="flex items-center gap-2">
+                                        <span class="relative flex h-2 w-2">
+                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                        </span>
+                                        <span class="text-red-700 text-xs font-bold tracking-wide">OFFLINE</span>
+                                    </div>`;
+
+                            const toggleButton = isOnline
+                                ? `<button onclick="toggleNodeStatus(${node.id}, 'OFFLINE')" class="text-[9px] bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 transition-colors whitespace-nowrap font-bold flex items-center gap-1">
+                                        <i class="fas fa-power-off"></i> Turn OFF
+                                   </button>`
+                                : `<button onclick="toggleNodeStatus(${node.id}, 'ONLINE')" class="text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded border border-emerald-200 transition-colors whitespace-nowrap font-bold flex items-center gap-1">
+                                        <i class="fas fa-check-circle"></i> Turn ON
+                                   </button>`;
+
+                            return `
+                        <tr class="hover:bg-sky-100/50 transition-colors group">
+                            <td class="p-4">
+                                <div class="font-semibold text-slate-800">${node.hostName}</div>
+                                <div class="text-[10px] text-slate-600 font-mono mt-0.5"><i class="fas fa-map-marker-alt"></i> ${node.lat.toFixed(3)}, ${node.lng.toFixed(3)}</div>
+                                ${sourceBadge}
+                            </td>
+                            <td class="p-4">
+                                <span class="${typeBgColor} border ${typeBorderColor} ${typeColor} px-2.5 py-1 rounded-md text-xs font-semibold">
+                                    <i class="fas ${icon} mr-1"></i> ${node.outletType}
+                                </span>
+                            </td>
+                            <td class="p-4 font-mono text-slate-900 font-bold">LKR <span class="text-base">${node.rate}</span><span class="text-xs text-slate-500">/kWh</span></td>
+                            <td class="p-4">
+                                <div class="flex flex-col gap-2 items-start">
+                                    ${statusIndicator}
+                                    <div class="flex gap-1.5 items-center">
+                                        ${toggleButton}
+                                        ${isOnline ? `
+                                        <button onclick="openCalculator('${node.hostName.replace(/'/g, "\\'")}', ${node.rate}, '${node.sourceType}')" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-850 px-2.5 py-1 rounded border border-emerald-300 transition-colors whitespace-nowrap font-bold">
+                                            <i class="fas fa-calculator"></i> Est. Bill
+                                        </button>` : ''}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `}).reverse().join(''); // Reverse to show newest first
+                    }
+
+                    // Clear Map Markers (except temp marker)
+                    map.eachLayer((layer) => {
+                        if (layer instanceof L.Marker && layer !== tempMarker) {
+                            map.removeLayer(layer);
+                        }
+                    });
+
+                    const solarIcon = createPulsingIcon('#f59e0b'); // Amber
+
+                    // Add Node Markers to Map
+                    nodes.forEach(node => {
+                        const isSolar = node.sourceType === 'Solar';
+                        const status = node.status || 'ONLINE';
+                        const isOnline = status === 'ONLINE';
+
+                        const targetColor = isOnline ? (isSolar ? '#f59e0b' : '#10b981') : '#94a3b8';
+                        const targetIcon = createPulsingIcon(targetColor, isOnline);
+
+                        const iconHeader = isSolar ? 'fa-solar-panel' : 'fa-home';
+                        const headerColor = isOnline ? (isSolar ? 'text-emerald-800' : 'text-slate-900') : 'text-slate-500';
+                        const headerBorder = isOnline ? (isSolar ? 'border-emerald-300' : 'border-slate-300') : 'border-slate-200';
+                        const statusBadge = isOnline 
+                            ? `<span class="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold uppercase tracking-wider">ONLINE</span>`
+                            : `<span class="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300 font-bold uppercase tracking-wider">OFFLINE</span>`;
+
+                        L.marker([node.lat, node.lng], { icon: targetIcon })
+                            .addTo(map)
+                            .bindPopup(`
+                            <div class="space-y-1 py-1 text-slate-800">
+                                <div class="flex items-center justify-between ${headerColor} font-extrabold text-lg mb-1 border-b ${headerBorder} pb-1">
+                                    <span><i class="fas ${iconHeader}"></i> ${node.hostName}</span>
+                                    ${statusBadge}
+                                </div>
+                                ${isSolar ? `<div class="text-xs text-emerald-800 font-bold mb-1"><i class="fas fa-sun"></i> Solar PV Station ${node.solarCapacity ? '(' + node.solarCapacity + 'kW)' : ''}</div>` : ''}
+                                <div class="text-sm flex justify-between gap-4"><span class="text-slate-600 font-semibold">Spec:</span> <span class="font-bold text-slate-800">${node.outletType}</span></div>
+                                <div class="text-sm flex justify-between gap-4 pb-1"><span class="text-slate-600 font-semibold">Rate:</span> <span class="text-emerald-800 font-bold font-mono">LKR ${node.rate}/kWh</span></div>
+                                ${isOnline 
+                                    ? `<button onclick="openCalculator('${node.hostName.replace(/'/g, "\\'")}', ${node.rate}, '${node.sourceType}')" class="mt-2 w-full text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white py-2 rounded transition-colors uppercase tracking-wider">
+                                        <i class="fas fa-calculator"></i> Calculate Bill
+                                       </button>`
+                                    : `<div class="mt-2 text-center text-xs font-bold text-red-700 bg-red-50 py-2 rounded border border-red-200 uppercase tracking-wider"><i class="fas fa-ban"></i> Station Offline</div>`
+                                }
+                            </div>
+                        `);
+                    });
+                } catch (e) {
+                    console.error("Error refreshing UI from Dexie: ", e);
+                }
+            }
+
+            // Form Submit Handler
+            document.getElementById('nodeForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const coordsStr = document.getElementById('coords').value;
+
+                if (!coordsStr) {
+                    // Shake effect on input
+                    const cInput = document.getElementById('coords');
+                    cInput.parentElement.classList.add('animate-[pulse_0.2s_ease-in-out_3]');
+                    setTimeout(() => cInput.parentElement.classList.remove('animate-[pulse_0.2s_ease-in-out_3]'), 600);
+
+                    alert("Please select a location on the map first!");
+                    return;
+                }
+
+                const coords = coordsStr.split(', ');
+                const lat = parseFloat(coords[0]);
+                const lng = parseFloat(coords[1]);
+
+                // Get selected source type
+                const sourceTypeOpt = "Solar";
+                const solarCapOpt = document.getElementById('solarCap').value;
+
+                try {
+                    // Add to DB
+                    await db.nodes.add({
+                        hostName: document.getElementById('hostName').value.trim(),
+                        outletType: document.getElementById('outletType').value,
+                        rate: document.getElementById('rate').value,
+                        lat: lat,
+                        lng: lng,
+                        sourceType: sourceTypeOpt,
+                        solarCapacity: sourceTypeOpt === 'Solar' ? solarCapOpt : ''
+                    });
+
+                    // Reset Form state
+                    document.getElementById('nodeForm').reset();
+                    document.getElementById('coords').value = '';
+
+                    // Remove Map Selection state
+                    if (tempMarker) {
+                        map.removeLayer(tempMarker);
+                        tempMarker = null;
+                    }
+
+                    // Show success effect (optional)
+                    const submitBtn = e.target.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i> ACTIVATED';
+                    submitBtn.classList.remove('from-primary', 'to-emerald-400');
+                    submitBtn.classList.add('bg-white', 'text-primary');
+
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.classList.add('from-primary', 'to-emerald-400');
+                        submitBtn.classList.remove('bg-white', 'text-primary');
+                    }, 2000);
+
+                    // Reload data
+                    await refreshUI();
+
+                } catch (err) {
+                    alert("Error saving node: " + err);
+                }
+            };
+
+            // Bill Calculator Logic
+            let currentRate = 0;
+
+            function openCalculator(name, rate, type) {
+                currentRate = rate || 0;
+                const typeBadge = type === 'Solar'
+                    ? '<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent border border-accent/20"><i class="fas fa-sun"></i> Solar</span>'
+                    : '<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/20"><i class="fas fa-plug"></i> Grid</span>';
+
+                document.getElementById('calcStationName').innerHTML = `${name} ${typeBadge}`;
+                document.getElementById('calcStationRate').innerText = rate;
+
+                const modal = document.getElementById('calcModal');
+                const content = document.getElementById('calcModalContent');
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                setTimeout(() => {
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
+                }, 10);
+
+                calculateTotal();
+            }
+
+            function closeCalculator() {
+                const modal = document.getElementById('calcModal');
+                const content = document.getElementById('calcModalContent');
+
+                content.classList.remove('scale-100', 'opacity-100');
+                content.classList.add('scale-95', 'opacity-0');
+
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }, 300);
+            }
+
+            function adjUnits(delta) {
+                const input = document.getElementById('calcUnits');
+                let val = parseFloat(input.value || "0");
+                val += delta;
+                if (val < 1) val = 1;
+                input.value = val;
+                calculateTotal();
+            }
+
+            function calculateTotal() {
+                const units = parseFloat(document.getElementById('calcUnits').value || "0");
+                const energyCost = units * currentRate;
+                const netFee = energyCost * 0.02; // 2% platform fee
+                const total = energyCost + netFee;
+
+                document.getElementById('calcEnergyCost').innerText = energyCost.toFixed(2);
+                document.getElementById('calcNetFee').innerText = netFee.toFixed(2);
+                document.getElementById('calcTotal').innerText = total.toFixed(2);
+            }
+
+            // Quick Bill Estimator Functions
+            async function updateEstimatorFromSelect() {
+                const select = document.getElementById('calcHostSelect');
+                const details = document.getElementById('estimatorDetails');
+                
+                if (!select.value) {
+                    details.classList.add('hidden');
+                    return;
+                }
+                
+                const nodeId = parseInt(select.value);
+                const node = await db.nodes.get(nodeId);
+                if (!node) return;
+                
+                document.getElementById('estLocation').innerText = `${node.lat.toFixed(5)}, ${node.lng.toFixed(5)}`;
+                document.getElementById('estPower').innerText = node.outletType;
+                document.getElementById('estRate').innerText = node.rate;
+                
+                details.classList.remove('hidden');
+                calculateEstTotal();
+            }
+
+            function calculateEstTotal() {
+                const rate = parseFloat(document.getElementById('estRate').innerText || "0");
+                const units = parseFloat(document.getElementById('estUnits').value || "0");
+                const energyCost = units * rate;
+                const netFee = energyCost * 0.02; // 2% platform fee
+                const total = energyCost + netFee;
+                
+                document.getElementById('estTotal').innerText = total.toFixed(2);
+            }
+
+            // Reset Data Function
+            async function clearAllData() {
+                if (confirm("Are you sure you want to delete all charging nodes from the local registry? This cannot be undone.")) {
+                    await db.nodes.clear();
+                    await refreshUI();
+
+                }
+            }
+
+            // Initial Boot
+            refreshUI();
+
+            // Navbar blur effect on scroll
+            window.addEventListener('scroll', () => {
+                const nav = document.getElementById('navbar');
+                const logoBox = document.getElementById('logo-box');
+                const logoText = document.getElementById('logo-text');
+                const logoSub = document.getElementById('logo-sub');
+                const navLinks = document.getElementById('nav-links');
+                const navActions = document.getElementById('nav-actions');
+                const nodeBox = document.getElementById('node-box');
+                const nodeCountText = document.getElementById('nodeCount');
+                const regBtn = document.getElementById('reg-btn');
+                
+                if (window.scrollY > (window.innerHeight - 100)) {
+                    // Scrolled below hero section -> light theme navbar
+                    nav.classList.remove('bg-transparent', 'border-transparent');
+                    nav.classList.add('bg-[#e0f2fe]/95', 'backdrop-blur-md', 'border-b-2', 'border-[#065f46]', 'shadow-sm');
+                    
+                    logoBox.classList.remove('bg-white/10', 'border-white/15');
+                    logoBox.classList.add('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]', 'shadow-sm');
+                    
+                    logoText.classList.remove('text-white');
+                    logoText.classList.add('text-slate-900');
+                    
+                    logoSub.classList.remove('text-white/70');
+                    logoSub.classList.add('text-slate-700');
+                    
+                    // Links
+                    const links = navLinks.querySelectorAll('a');
+                    links.forEach(l => {
+                        l.classList.remove('text-white/80');
+                        l.classList.add('text-slate-700');
+                    });
+                    
+                    // Actions
+                    navActions.classList.remove('bg-white/10', 'border-white/15');
+                    navActions.classList.add('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]');
+                    const actionHost = navActions.querySelector('a:first-child');
+                    actionHost.classList.remove('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                    actionHost.classList.add('text-slate-700', 'hover:text-slate-900', 'hover:bg-[#d0eafc]', 'hover:shadow');
+                    
+                    nodeBox.classList.remove('bg-white/10', 'border-white/15');
+                    nodeBox.classList.add('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]');
+                    nodeCountText.classList.remove('text-white');
+                    nodeCountText.classList.add('text-slate-800');
+
+                    regBtn.classList.remove('bg-white/10', 'border-white/15', 'text-white');
+                    regBtn.classList.add('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]', 'text-slate-800');
+                } else {
+                    // On hero section -> transparent dark theme navbar
+                    nav.classList.add('bg-transparent', 'border-transparent');
+                    nav.classList.remove('bg-[#e0f2fe]/95', 'backdrop-blur-md', 'border-b-2', 'border-[#065f46]', 'shadow-sm');
+                    
+                    logoBox.classList.add('bg-white/10', 'border-white/15');
+                    logoBox.classList.remove('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]', 'shadow-sm');
+                    
+                    logoText.classList.add('text-white');
+                    logoText.classList.remove('text-slate-900');
+                    
+                    logoSub.classList.add('text-white/70');
+                    logoSub.classList.remove('text-slate-700');
+                    
+                    // Links
+                    const links = navLinks.querySelectorAll('a');
+                    links.forEach(l => {
+                        l.classList.add('text-white/80');
+                        l.classList.remove('text-slate-700');
+                    });
+                    
+                    // Actions
+                    navActions.classList.add('bg-white/10', 'border-white/15');
+                    navActions.classList.remove('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]');
+                    const actionHost = navActions.querySelector('a:first-child');
+                    actionHost.classList.add('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                    actionHost.classList.remove('text-slate-700', 'hover:text-slate-900', 'hover:bg-[#d0eafc]', 'hover:shadow');
+                    
+                    nodeBox.classList.add('bg-white/10', 'border-white/15');
+                    nodeBox.classList.remove('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]');
+                    nodeCountText.classList.add('text-white');
+                    nodeCountText.classList.remove('text-slate-800');
+
+                    regBtn.classList.add('bg-white/10', 'border-white/15', 'text-white');
+                    regBtn.classList.remove('bg-[#e0f2fe]', 'border-2', 'border-[#065f46]', 'text-slate-800');
+                }
+            });
+
+            // Toggle node status between ONLINE and OFFLINE
+            async function toggleNodeStatus(id, newStatus) {
+                try {
+                    await db.nodes.update(id, { status: newStatus });
+                    await refreshUI();
+                } catch (e) {
+                    console.error("Error toggling node status: ", e);
+                    alert("Error changing status: " + e.message);
+                }
+            }
+
+            // Toggle mute for hero video
+            function toggleMute() {
+                const video = document.getElementById('heroVideo');
+                const muteIcon = document.getElementById('muteIcon');
+                const muteText = document.getElementById('muteText');
+                
+                if (video.muted) {
+                    video.muted = false;
+                    muteIcon.classList.remove('fa-volume-mute');
+                    muteIcon.classList.add('fa-volume-up');
+                    muteText.innerText = "Mute";
+                } else {
+                    video.muted = true;
+                    muteIcon.classList.remove('fa-volume-up');
+                    muteIcon.classList.add('fa-volume-mute');
+                    muteText.innerText = "Unmute";
+                }
+            }
+        </script>
+    </body>
+
+    </html>
